@@ -1,4 +1,5 @@
 # docKube
+# Il est nécessaire de suivre les étapes dans l'ordre
 # Installer le serveur NFS
 Exécuter le script installNFS.sh sur votre serveur linux
 # Installer Kubernetes (k8s)
