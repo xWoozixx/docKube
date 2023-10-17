@@ -149,3 +149,4 @@ kubectl delete ingress -n lamp ${appName}-ingress
 sudo rm -r ${path}/${appName}
 EOF
 chmod +x ${path}/${appName}/delete-${appName}.sh
+rm $path/var.txt
