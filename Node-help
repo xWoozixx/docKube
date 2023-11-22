@@ -1,0 +1,43 @@
+# ! Ajouter un noeud, un certain temps après l'init
+
+# Créer un token :
+kubeadm token create --print-join-command
+
+# Une commande de ce type vous est renvoyé
+kubeadm join <YourIp>:6443 \
+    --token <YourToken> \
+    --discovery-token-ca-cert-hash sha256:<YourSha256>
+
+# Exécutez la commande sur le nouveau noeud du cluster (le sudo est nécessaire)
+
+# Retournez sur le CP pour vérifier si l'ajout à fonctionné :
+kubectl get nodes
+
+
+
+# ! supprimer un noeud !
+
+# Mets en état hors-service un nœud
+kubectl cordon <nom-du-nœud>
+
+# Evacue les pods du nœud
+kubectl drain <nom-du-nœud> --ignore-daemonsets
+
+kubectl delete node <nom-du-nœud>
+
+kubectl get nodes
+
+
+
+# Autres commandes utiles pour l'ajout
+
+# Lister les token
+kubeadm token list
+
+
+# Générer un token
+kubeadm token create
+
+
+# Retrouver le hash
+openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //'
