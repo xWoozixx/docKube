@@ -1,0 +1,191 @@
+Dockerfile
+
+# Utilisez l'image officielle python
+FROM python:3.10.13-alpine3.18
+
+# Mise à jour de la liste des paquets
+RUN apk update
+
+# Installation de git
+RUN apk --no-cache add git
+
+# Installation des modules pour django
+RUN apk --no-cache add \
+    openldap-dev \
+    libsasl \
+    libssl1.1 \
+    postgresql-dev \
+    musl-dev
+
+# Entrypoint
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+WORKDIR /app
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+
+entrypoint.sh
+
+
+#!/bin/sh
+# echo "Repo :" $GIT_REPO_URL
+
+# Mise à jour des packets installés
+apk update
+apk --no-cache upgrade \
+    git\
+    openldap-dev \
+    libsasl \
+    libssl1.1 \
+    postgresql-dev \
+    musl-dev \
+
+
+# Cloner le repo Git
+git clone $GIT_REPO_URL /app
+
+# Vos autres étapes de configuration...
+rm -r /app/venv/
+
+pip install --upgrade pip
+
+pip install -r /app/requirements.txt
+
+python manage.py makemigrations
+
+python manage.py migrate
+
+
+# Démarer le serveur
+
+python manage.py runserver 0.0.0.0:80
+
+# Garder le conteneur actif
+# tail -f /dev/null
+
+
+configmap
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: django-config
+data:
+  GIT_REPO_URL: "https://gitlab-ci-token:yourtoken@gitlab.in.ac-noumea.nc/dsi/bsi/ptitdej.git"
+  SECRET_KEY: "django-insecure-a5^*hxi)z9b@em17a=1-d)5rtgf%3)4j=89wj++@t*zh!78adi"
+  ENGINE: "django.db.backends.postgresql"
+  NAME: "ptidej_dev"
+  USERDB: "ptidej_dev_adm"
+  PASSWORD: "****"
+  HOST: "d-bddpostgre-01.in.ac-noumea.nc"
+  PORT: "5432"
+  DEBUG: "True"
+
+Deploy 
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: django
+  template:
+    metadata:
+      labels:
+        app: django
+    spec:
+      containers:
+      - name: django-container
+        image: woozix/django:test
+        command: ["/usr/local/bin/entrypoint.sh"]
+        env:
+        - name: GIT_REPO_URL
+          valueFrom:
+            configMapKeyRef:
+              name: django-config
+              key: GIT_REPO_URL
+        - name: SECRET_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: django-config
+              key: SECRET_KEY
+        - name: ENGINE
+          valueFrom:
+            configMapKeyRef:
+              name: django-config
+              key: ENGINE
+        - name: NAME
+          valueFrom:
+            configMapKeyRef:
+              name: django-config
+              key: NAME
+        - name: USERDB
+          valueFrom:
+            configMapKeyRef:
+              name: django-config
+              key: USERDB
+        - name: PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: django-config
+              key: PASSWORD
+        - name: HOST
+          valueFrom:
+            configMapKeyRef:
+              name: django-config
+              key: HOST
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: django-config
+              key: PORT
+        - name: DEBUG
+          valueFrom:
+            configMapKeyRef:
+              name: django-config
+              key: DEBUG
+
+---
+
+# app-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-service
+spec:
+  type: ClusterIP
+  selector:
+    app: django
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+
+
+---
+
+# app-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: django-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: django.k.in.ac-noumea.nc
+      http:
+        paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: django-service
+                port:
+                  number: 80
+
